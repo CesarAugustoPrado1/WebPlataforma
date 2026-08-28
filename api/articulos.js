@@ -1,34 +1,71 @@
-import { obtenerArticulos } from './_lib/plataforma.js';
+import { obtenerArticulos, ATRIBUTOS_ARTICULO_DEFAULT } from './_lib/plataforma.js';
+import {
+  COMPARADORES_POR_TIPO, definicionFiltro, esColumnaValida, comparadorPorDefecto,
+} from '../filtros.config.js';
 
-// GET /api/articulos?q=texto[&campo=Nombre|ArticuloEmpresa|ArticuloID][&comparador=LikeFull|Equals|...]
+// Normaliza el valor según el tipo del filtro para lo que espera el ERP.
+function normalizarValor(tipo, comparador, valor) {
+  const v = (valor ?? '').toString().trim();
+  if (comparador === 'Null') return '';
+  if (tipo === 'boolean') {
+    if (/^(true|1|si|sí)$/i.test(v)) return 'True';
+    if (/^(false|0|no)$/i.test(v)) return 'False';
+    return v;
+  }
+  if (tipo === 'decimal') return v.replace('.', ','); // es-AR: coma decimal
+  return v;
+}
+
+// Valida y arma la lista de filtros a partir de lo que mandó el frontend.
+function construirFiltros(raw) {
+  const out = [];
+  for (const f of raw) {
+    const def = definicionFiltro(f.atributo);
+    if (!def) continue; // atributo desconocido -> lo ignoramos
+    const permitidos = COMPARADORES_POR_TIPO[def.tipo] || COMPARADORES_POR_TIPO.string;
+    const comparador = permitidos.includes(f.comparador) ? f.comparador : comparadorPorDefecto(def.tipo);
+    const valor = normalizarValor(def.tipo, comparador, f.valor);
+    if (comparador !== 'Null' && valor === '') continue; // sin valor -> no filtra
+    out.push({ atributo: def.atributo, comparador, valor });
+  }
+  return out;
+}
+
 export default async function handler(req, res) {
   try {
+    // Modo simple (compatibilidad): ?q=texto
     const q = (req.query.q || '').toString().trim();
-    const campo = (req.query.campo || '').toString().trim();
-    const comparador = (req.query.comparador || '').toString().trim();
-
-    let filtros = [];
-    if (q) {
-      if (campo) {
-        const cmp = comparador || (campo === 'ArticuloID' ? 'Equals' : 'LikeFull');
-        filtros = [{ atributo: campo, comparador: cmp, valor: q }];
-      } else if (/^\d+$/.test(q)) {
-        filtros = [{ atributo: 'ArticuloID', comparador: 'Equals', valor: q }];
-      } else {
-        filtros = [{ atributo: 'Nombre', comparador: 'LikeFull', valor: q }];
-      }
+    // Modo filtros: ?filtros=<json codificado>  (array de {atributo, comparador, valor})
+    let rawFiltros = [];
+    if (req.query.filtros) {
+      try { rawFiltros = JSON.parse(req.query.filtros); } catch { rawFiltros = []; }
     }
 
-    let articulos = await obtenerArticulos({ filtros });
+    let filtros = construirFiltros(Array.isArray(rawFiltros) ? rawFiltros : []);
 
-    // Fallback: si buscaban texto por nombre y no hubo match, probamos por código de empresa.
-    if (q && !campo && !/^\d+$/.test(q) && articulos.length === 0) {
+    // Si no vinieron filtros estructurados pero sí un q, replicamos el comportamiento anterior.
+    if (!filtros.length && q) {
+      if (/^\d+$/.test(q)) filtros = [{ atributo: 'ArticuloID', comparador: 'Equals', valor: q }];
+      else filtros = [{ atributo: 'Nombre', comparador: 'LikeFull', valor: q }];
+    }
+
+    // Columnas a traer: las por defecto + los atributos de los filtros usados (si son columnas válidas).
+    const extra = filtros
+      .map((f) => f.atributo)
+      .filter((a) => esColumnaValida(a) && !ATRIBUTOS_ARTICULO_DEFAULT.includes(a));
+    const atributos = [...ATRIBUTOS_ARTICULO_DEFAULT, ...new Set(extra)];
+
+    let articulos = await obtenerArticulos({ atributos, filtros });
+
+    // Fallback del modo simple: si buscaba texto por nombre y no hubo match, probar por código.
+    if (q && !rawFiltros.length && !/^\d+$/.test(q) && articulos.length === 0) {
       articulos = await obtenerArticulos({
+        atributos,
         filtros: [{ atributo: 'ArticuloEmpresa', comparador: 'LikeFull', valor: q }],
       });
     }
 
-    res.status(200).json({ total: articulos.length, articulos });
+    res.status(200).json({ total: articulos.length, articulos, filtrosAplicados: filtros });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }

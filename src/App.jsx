@@ -1,4 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import {
+  filtrosHabilitados, COMPARADORES_POR_TIPO, LABEL_COMPARADOR, comparadorPorDefecto,
+} from '../filtros.config.js';
 
 const fmt = (n) =>
   n === null || n === undefined ? '—'
@@ -9,9 +12,7 @@ function useHealth() {
   useEffect(() => {
     fetch('/api/health')
       .then((r) => r.json())
-      .then((d) => setHealth(d.conexionOk
-        ? { estado: 'ok', ...d }
-        : { estado: 'error', ...d }))
+      .then((d) => setHealth(d.conexionOk ? { estado: 'ok', ...d } : { estado: 'error', ...d }))
       .catch((e) => setHealth({ estado: 'error', error: e.message }));
   }, []);
   return health;
@@ -28,6 +29,51 @@ function EstadoConexion({ health }) {
     <div className="estado">
       <span className="dot" style={{ background: color }} />
       <span>{label}</span>
+    </div>
+  );
+}
+
+// Un control de valor según el tipo del filtro.
+function ControlValor({ def, valor, onChange }) {
+  if (def.tipo === 'boolean') {
+    return (
+      <select value={valor} onChange={(e) => onChange(e.target.value)}>
+        <option value="">(cualquiera)</option>
+        <option value="true">Sí</option>
+        <option value="false">No</option>
+      </select>
+    );
+  }
+  if (def.tipo === 'date') {
+    return <input type="date" value={valor} onChange={(e) => onChange(e.target.value)} />;
+  }
+  const tipoInput = def.tipo === 'int' || def.tipo === 'decimal' ? 'number' : 'text';
+  return (
+    <input
+      type={tipoInput}
+      step={def.tipo === 'decimal' ? 'any' : undefined}
+      value={valor}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="valor…"
+    />
+  );
+}
+
+function FiltroRow({ def, estado, setEstado }) {
+  const comparadores = COMPARADORES_POR_TIPO[def.tipo] || COMPARADORES_POR_TIPO.string;
+  return (
+    <div className="filtro-row">
+      <label className="filtro-label">{def.label}</label>
+      <select
+        className="filtro-comp"
+        value={estado.comparador}
+        onChange={(e) => setEstado({ ...estado, comparador: e.target.value })}
+      >
+        {comparadores.map((c) => (
+          <option key={c} value={c}>{LABEL_COMPARADOR[c] || c}</option>
+        ))}
+      </select>
+      <ControlValor def={def} valor={estado.valor} onChange={(v) => setEstado({ ...estado, valor: v })} />
     </div>
   );
 }
@@ -100,18 +146,36 @@ function StockPanel({ articulo, onClose }) {
 
 export default function App() {
   const health = useHealth();
-  const [q, setQ] = useState('');
+  const filtrosDef = useMemo(() => filtrosHabilitados(), []);
+
+  // Estado por filtro: { [atributo]: { comparador, valor } }
+  const [valores, setValores] = useState(() =>
+    Object.fromEntries(filtrosDef.map((f) => [f.atributo, { comparador: comparadorPorDefecto(f.tipo), valor: '' }]))
+  );
+
   const [estado, setEstado] = useState('idle');
   const [articulos, setArticulos] = useState([]);
   const [error, setError] = useState('');
   const [sel, setSel] = useState(null);
 
+  // Atributos extra (de filtros habilitados que son columnas) para mostrar en resultados.
+  const colsExtra = useMemo(
+    () => filtrosDef.filter((f) => f.columna && !['ArticuloID', 'Nombre', 'ArticuloEmpresa'].includes(f.atributo)),
+    [filtrosDef]
+  );
+
+  const setFiltro = (atributo, nuevo) =>
+    setValores((prev) => ({ ...prev, [atributo]: nuevo }));
+
   const buscar = useCallback((e) => {
     e?.preventDefault();
-    const term = q.trim();
-    if (!term) return;
+    const filtros = filtrosDef
+      .map((f) => ({ atributo: f.atributo, ...valores[f.atributo] }))
+      .filter((f) => (f.valor ?? '').toString().trim() !== '');
+
     setEstado('cargando'); setError(''); setSel(null);
-    fetch(`/api/articulos?q=${encodeURIComponent(term)}`)
+    const url = `/api/articulos?filtros=${encodeURIComponent(JSON.stringify(filtros))}`;
+    fetch(url)
       .then((r) => r.json())
       .then((d) => {
         if (d.error) throw new Error(d.error);
@@ -119,7 +183,12 @@ export default function App() {
         setEstado('ok');
       })
       .catch((err) => { setError(err.message); setEstado('error'); });
-  }, [q]);
+  }, [filtrosDef, valores]);
+
+  const limpiar = () => {
+    setValores(Object.fromEntries(filtrosDef.map((f) => [f.atributo, { comparador: comparadorPorDefecto(f.tipo), valor: '' }])));
+    setArticulos([]); setEstado('idle'); setSel(null);
+  };
 
   return (
     <div className="app">
@@ -128,22 +197,28 @@ export default function App() {
         <EstadoConexion health={health} />
       </header>
 
-      <form className="buscador" onSubmit={buscar}>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por nombre, código de empresa o ID…"
-          autoFocus
-        />
-        <button type="submit" disabled={estado === 'cargando'}>
-          {estado === 'cargando' ? 'Buscando…' : 'Buscar'}
-        </button>
+      <form className="filtros" onSubmit={buscar}>
+        <div className="filtros-grid">
+          {filtrosDef.map((f) => (
+            <FiltroRow
+              key={f.atributo}
+              def={f}
+              estado={valores[f.atributo]}
+              setEstado={(nuevo) => setFiltro(f.atributo, nuevo)}
+            />
+          ))}
+        </div>
+        <div className="filtros-acciones">
+          <button type="submit" className="btn-primario" disabled={estado === 'cargando'}>
+            {estado === 'cargando' ? 'Buscando…' : 'Buscar'}
+          </button>
+          <button type="button" className="btn-sec" onClick={limpiar}>Limpiar</button>
+          <span className="filtros-hint">{filtrosDef.length} filtro(s) configurado(s)</span>
+        </div>
       </form>
 
       {estado === 'error' && <div className="error-box">{error}</div>}
-      {estado === 'ok' && (
-        <div className="resultados-count">{articulos.length} artículo(s)</div>
-      )}
+      {estado === 'ok' && <div className="resultados-count">{articulos.length} artículo(s)</div>}
 
       <div className="layout">
         <div className="lista">
@@ -158,10 +233,21 @@ export default function App() {
                 ID {a.ArticuloID} · {a.ArticuloEmpresa || 's/código'}
                 {a.SeVende === 'True' && <span className="tag">vende</span>}
               </div>
+              {colsExtra.some((c) => a[c.atributo] !== undefined && a[c.atributo] !== '') && (
+                <div className="item-extra">
+                  {colsExtra
+                    .filter((c) => a[c.atributo] !== undefined && a[c.atributo] !== '')
+                    .map((c) => (
+                      <span key={c.atributo} className="chip">
+                        {c.label}: {String(a[c.atributo])}
+                      </span>
+                    ))}
+                </div>
+              )}
             </button>
           ))}
           {estado === 'ok' && articulos.length === 0 && (
-            <div className="muted">Sin resultados para “{q}”.</div>
+            <div className="muted">Sin resultados con esos filtros.</div>
           )}
         </div>
 
