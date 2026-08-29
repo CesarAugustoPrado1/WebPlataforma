@@ -1,7 +1,5 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import { CATALOGO_CLIENTES } from '../../clientes.config.js';
-import { useBuscador } from '../components/useBuscador.jsx';
-import { norm } from '../lib/format.js';
+import { useState, useEffect } from 'react';
+import ListaClientes from '../components/ListaClientes.jsx';
 
 const FICHA = [
   ['NombreLegal', 'Razón social'], ['ClaveTributaria', 'CUIT'], ['CondicionAnteElIVANombre', 'Cond. IVA'],
@@ -16,19 +14,18 @@ const FICHA = [
   ['Observacion', 'Observación'],
 ];
 
-function Ficha({ id, onClose }) {
+function Ficha({ cliente }) {
   const [data, setData] = useState({ estado: 'cargando' });
   useEffect(() => {
     setData({ estado: 'cargando' });
-    fetch(`/api/clientes?id=${encodeURIComponent(id)}`).then((r) => r.json())
+    fetch(`/api/clientes?id=${encodeURIComponent(cliente.id)}`).then((r) => r.json())
       .then((d) => setData({ estado: 'ok', cliente: d.cliente }))
       .catch((e) => setData({ estado: 'error', error: e.message }));
-  }, [id]);
+  }, [cliente]);
   return (
     <div className="panel">
       <div className="panel-head">
-        <div className="panel-title">{data.cliente?.Nombre || `Cliente ${id}`}</div>
-        <button className="btn-x" onClick={onClose}>✕</button>
+        <div className="panel-title">{data.cliente?.Nombre || cliente.nombre}</div>
       </div>
       {data.estado === 'cargando' && <div className="muted">Cargando ficha…</div>}
       {data.estado === 'error' && <div className="error-box">{data.error}</div>}
@@ -46,70 +43,11 @@ function Ficha({ id, onClose }) {
 }
 
 export default function ClientesView() {
-  const [estado, setEstado] = useState('idle');
-  const [clientes, setClientes] = useState([]);
-  const [error, setError] = useState('');
-  const [refine, setRefine] = useState('');
-  const [sel, setSel] = useState(null);
-
-  const onBuscar = useCallback((filtros) => {
-    setEstado('cargando'); setError(''); setSel(null);
-    fetch(`/api/clientes?filtros=${encodeURIComponent(JSON.stringify(filtros))}`).then((r) => r.json())
-      .then((d) => { if (d.error) throw new Error(d.error); setClientes(d.clientes || []); setEstado('ok'); })
-      .catch((err) => { setError(err.message); setEstado('error'); });
-  }, []);
-
-  const { filtrosDef, toolbar, chips, drawers } = useBuscador({
-    catalogo: CATALOGO_CLIENTES,
-    storageKey: 'webplataforma.settings.clientes.v1',
-    valoresUrl: (a) => `/api/valores?entidad=clientes&atributo=${encodeURIComponent(a)}`,
-    onBuscar, buscando: estado === 'cargando',
-    refine, setRefine, refinePlaceholder: 'Refinar resultados (nombre, localidad, ID…)',
-  });
-
-  const colsExtra = useMemo(
-    () => filtrosDef.filter((f) => f.columna && !['ClienteID', 'Nombre', 'Localidad', 'Provincia'].includes(f.atributo)),
-    [filtrosDef]
-  );
-
-  const vista = useMemo(() => {
-    const q = norm(refine).trim();
-    if (!q) return clientes;
-    const campos = ['Nombre', 'NombreLegal', 'Localidad', 'Provincia', 'ClienteID', 'Email', ...colsExtra.map((c) => c.atributo)];
-    return clientes.filter((c) => campos.some((k) => norm(c[k]).includes(q)));
-  }, [clientes, refine, colsExtra]);
-
   return (
-    <div className="vista">
-      {toolbar}
-      {chips}
-      {estado === 'error' && <div className="error-box">{error}</div>}
-      {estado === 'ok' && <div className="resultados-count">{vista.length}{refine ? ` de ${clientes.length}` : ''} cliente(s)</div>}
-      <div className="layout">
-        <div className="lista">
-          {vista.map((c) => (
-            <button key={c.ClienteID} className={`item ${sel === c.ClienteID ? 'activo' : ''}`} onClick={() => setSel(c.ClienteID)}>
-              <div className="item-nombre">{c.Nombre || '(sin nombre)'}</div>
-              <div className="item-meta">ID {c.ClienteID}{c.Localidad ? ` · ${c.Localidad}` : ''}{c.Provincia ? `, ${c.Provincia}` : ''}</div>
-              {(c.CondicionAnteElIVANombre || colsExtra.some((x) => (c[x.atributo] ?? '') !== '')) && (
-                <div className="item-extra">
-                  {c.CondicionAnteElIVANombre && <span className="chip">{c.CondicionAnteElIVANombre}</span>}
-                  {colsExtra.filter((x) => (c[x.atributo] ?? '') !== '').map((x) => (
-                    <span key={x.atributo} className="chip">{x.label}: {String(c[x.atributo])}</span>
-                  ))}
-                </div>
-              )}
-            </button>
-          ))}
-          {estado === 'ok' && vista.length === 0 && <div className="muted">Sin resultados.</div>}
-          {estado === 'idle' && <div className="muted">Configurá los filtros y tocá Buscar.</div>}
-        </div>
-        <div className="detalle">
-          {sel ? <Ficha id={sel} onClose={() => setSel(null)} />
-            : <div className="placeholder">Elegí un cliente para ver su ficha.</div>}
-        </div>
-      </div>
-      {drawers}
-    </div>
+    <ListaClientes
+      storageKey="webplataforma.settings.clientes.v1"
+      renderDetalle={(c) => <Ficha cliente={c} />}
+      placeholder="Elegí un cliente para ver su ficha."
+    />
   );
 }

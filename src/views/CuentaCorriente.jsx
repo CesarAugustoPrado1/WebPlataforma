@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import ClientePicker from '../components/ClientePicker.jsx';
+import ListaClientes from '../components/ListaClientes.jsx';
 import { fmtMoneda, fmtFecha, parseNum } from '../lib/format.js';
 
-function Detalle({ cliente }) {
+function SaldoDetalle({ cliente }) {
   const [data, setData] = useState({ estado: 'cargando' });
   useEffect(() => {
     setData({ estado: 'cargando' });
@@ -11,7 +11,7 @@ function Detalle({ cliente }) {
       .catch((e) => setData({ estado: 'error', error: e.message }));
   }, [cliente]);
 
-  if (data.estado === 'cargando') return <div className="muted">Cargando cuenta corriente…</div>;
+  if (data.estado === 'cargando') return <div className="cc"><div className="muted">Cargando cuenta corriente de {cliente.nombre}…</div></div>;
   if (data.estado === 'error') return <div className="error-box">{data.error}</div>;
   const renglones = data.renglones || [];
   return (
@@ -52,11 +52,11 @@ function Detalle({ cliente }) {
 }
 
 export default function CuentaCorrienteView() {
-  const [cliente, setCliente] = useState(null);
   return (
-    <div className="vista">
-      <ClientePicker onSelect={setCliente} seleccionado={cliente?.id} />
-      {cliente ? <Detalle cliente={cliente} /> : <div className="placeholder">Buscá y elegí un cliente para ver su cuenta corriente.</div>}
-    </div>
+    <ListaClientes
+      storageKey="webplataforma.settings.cc.v1"
+      renderDetalle={(c) => <SaldoDetalle cliente={c} />}
+      placeholder="Filtrá y elegí un cliente para ver su cuenta corriente."
+    />
   );
 }
