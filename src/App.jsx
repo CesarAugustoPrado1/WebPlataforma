@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import ArticulosView from './views/Articulos.jsx';
 import ClientesView from './views/Clientes.jsx';
 import PedidosView from './views/Pedidos.jsx';
+import StockView from './views/Stock.jsx';
+import CuentaCorrienteView from './views/CuentaCorriente.jsx';
+import PendientesView from './views/Pendientes.jsx';
 
 function useHealth() {
   const [health, setHealth] = useState({ estado: 'cargando' });
@@ -23,8 +26,11 @@ function EstadoConexion({ health }) {
 
 const TABS = [
   { id: 'articulos', label: 'Artículos' },
+  { id: 'stock', label: 'Stock' },
   { id: 'clientes', label: 'Clientes' },
   { id: 'pedidos', label: 'Pedidos' },
+  { id: 'cuentacorriente', label: 'Cuenta corriente' },
+  { id: 'pendientes', label: 'Renglones pendientes' },
 ];
 
 export default function App() {
@@ -48,8 +54,11 @@ export default function App() {
       </header>
 
       {tab === 'articulos' && <ArticulosView />}
+      {tab === 'stock' && <StockView />}
       {tab === 'clientes' && <ClientesView />}
       {tab === 'pedidos' && <PedidosView />}
+      {tab === 'cuentacorriente' && <CuentaCorrienteView />}
+      {tab === 'pendientes' && <PendientesView />}
     </div>
   );
 }

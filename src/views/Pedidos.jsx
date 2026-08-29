@@ -48,7 +48,9 @@ function Cabecera({ pedido, onClose }) {
 }
 
 export default function PedidosView() {
-  const hace7 = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+  const seedExtra = useMemo(() => ({
+    FechaDeEmision: { comparador: 'GreaterOrEqualsThan', valor: new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10) },
+  }), []);
   const [estado, setEstado] = useState('idle');
   const [pedidos, setPedidos] = useState([]);
   const [error, setError] = useState('');
@@ -67,7 +69,7 @@ export default function PedidosView() {
     storageKey: 'webplataforma.settings.pedidos.v1',
     onBuscar, buscando: estado === 'cargando',
     refine, setRefine, refinePlaceholder: 'Refinar resultados (número, cliente…)',
-    seedExtra: { FechaDeEmision: { comparador: 'GreaterOrEqualsThan', valor: hace7 } },
+    seedExtra,
   });
 
   const vista = useMemo(() => {

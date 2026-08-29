@@ -345,3 +345,37 @@ export async function obtenerValoresDistintosClientes(pares) {
   }
   return out;
 }
+
+// ---- Cuenta corriente (composición de saldo) --------------------------------
+export const ATRIBUTOS_SALDO = [
+  'FechaContable', 'Tipo', 'Numero', 'FechaDeVencimiento',
+  'DebeMonedaExpresion', 'HaberMonedaExpresion', 'SaldoMonedaExpresion', 'Moneda',
+  'CondicionDePagoNombre', 'Referencia1',
+];
+
+export async function obtenerComposicionDeSaldo(clienteId, atributos = ATRIBUTOS_SALDO, moneda = null) {
+  const atribXml = atributos.map(a => `<plat:ComposicionDeSaldoDTOAtributos>${esc(a)}</plat:ComposicionDeSaldoDTOAtributos>`).join('');
+  let body = `<plat:ObtenerComposicionDeSaldo><plat:AtributosVisibles>${atribXml}</plat:AtributosVisibles>` +
+    `<plat:Clientes><plat:int>${esc(clienteId)}</plat:int></plat:Clientes>`;
+  if (moneda) body += `<plat:MonedaExpresion>${esc(moneda)}</plat:MonedaExpresion>`;
+  body += `</plat:ObtenerComposicionDeSaldo>`;
+  const soapText = await soapCall('ServicioCCOCliente', 'ObtenerComposicionDeSaldo', body);
+  const parsed = extractResult(soapText, 'ObtenerComposicionDeSaldoResult');
+  const cli = asArray(parsed?.ComposicionDeSaldo?.Cliente)[0];
+  return asArray(cli?.Renglon).map((r) => {
+    const o = limpiarItem(r, 'Comprobante');
+    o.Comprobante = o.Comprobante ?? r['@_Comprobante'];
+    return o;
+  });
+}
+
+// ---- Renglones pendientes de remitir (detalle de notas de pedido) ------------
+export async function obtenerRenglonesPendientes(clienteId, estado = 'Pendiente') {
+  const body = `<plat:ObtenerDetalleNotaPedido>` +
+    `<plat:ClienteId>${esc(clienteId)}</plat:ClienteId>` +
+    `<plat:EstadoRemision>${esc(estado)}</plat:EstadoRemision>` +
+    `</plat:ObtenerDetalleNotaPedido>`;
+  const soapText = await soapCall('ServicioVENTNotaDePedido', 'ObtenerDetalleNotaPedido', body);
+  const parsed = extractResult(soapText, 'ObtenerDetalleNotaPedidoResult');
+  return asArray(parsed?.DetallesNotasPedido?.DetalleNotaPedido).map((r) => limpiarItem(r));
+}
