@@ -7,7 +7,7 @@ import { XMLParser } from 'fast-xml-parser';
 export const CONFIG = {
   baseUrl: process.env.PLATAFORMA_URL || 'http://wspirkastone.pypcloud.net:1881',
   ns: 'http://plataforma.net.ar/',
-  timeoutMs: Number(process.env.PLATAFORMA_TIMEOUT_MS || 25000),
+  timeoutMs: Number(process.env.PLATAFORMA_TIMEOUT_MS || 55000),
 };
 
 const parser = new XMLParser({
@@ -16,10 +16,15 @@ const parser = new XMLParser({
   parseTagValue: false,
 });
 
-// Convierte "1.234,56" (es-AR) o "0,000" a Number. Devuelve null si no es numérico.
+// Convierte a Number tolerando ambos formatos: es-AR "1.234,56" / "0,000" (coma
+// decimal) y el invariante "615406.00" (punto decimal). Devuelve null si no aplica.
 export function toNumber(v) {
   if (v === undefined || v === null || v === '') return null;
-  const s = String(v).trim().replace(/\./g, '').replace(',', '.');
+  let s = String(v).trim();
+  const tieneComa = s.includes(','), tienePunto = s.includes('.');
+  if (tieneComa && tienePunto) s = s.replace(/\./g, '').replace(',', '.'); // es-AR
+  else if (tieneComa) s = s.replace(',', '.');                            // coma decimal
+  // solo punto o sin separador: se deja tal cual (punto decimal invariante)
   const n = Number(s);
   return Number.isNaN(n) ? null : n;
 }
@@ -36,12 +41,19 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
+// Namespaces por servicio (la mayoría usa plataforma.net.ar; clientes usa otro).
+const NS_POR_SERVICIO = {
+  ServicioCCOCliente: 'http://wsplataforma.intecsoft.com.ar/',
+};
+const nsDe = (service) => NS_POR_SERVICIO[service] || CONFIG.ns;
+
 // Llamada SOAP 1.1 cruda. Devuelve el texto XML completo de la respuesta.
 async function soapCall(service, action, innerBodyXml) {
   const url = `${CONFIG.baseUrl}/${service}.asmx`;
+  const ns = nsDe(service);
   const envelope =
     `<?xml version="1.0" encoding="utf-8"?>` +
-    `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:plat="${CONFIG.ns}">` +
+    `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:plat="${ns}">` +
     `<soap:Body>${innerBodyXml}</soap:Body></soap:Envelope>`;
 
   const ctrl = new AbortController();
@@ -52,7 +64,7 @@ async function soapCall(service, action, innerBodyXml) {
       method: 'POST',
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
-        SOAPAction: `"${CONFIG.ns}${action}"`,
+        SOAPAction: `"${ns}${action}"`,
       },
       body: envelope,
       signal: ctrl.signal,
@@ -228,5 +240,82 @@ export async function obtenerStock({ articulosId = [], depositosId = [], atribut
     const total = {};
     for (const attr of atributos) total[attr] = depositos.reduce((s, d) => s + (d[attr] || 0), 0);
     return { articuloId: a['@_ArticuloID'], articuloEmpresa: a['@_ArticuloEmpresa'] ?? null, depositos, total };
+  });
+}
+
+// ---- Helpers genéricos para entidades con AtributosVisibles + Filtros --------
+function filtrosXml(filtros = []) {
+  return filtros.map(f =>
+    `<plat:Filtro>` +
+    `<plat:Atributo>${esc(f.atributo)}</plat:Atributo>` +
+    `<plat:Comparador>${esc(f.comparador)}</plat:Comparador>` +
+    `<plat:Valor>${esc(f.valor ?? '')}</plat:Valor>` +
+    `</plat:Filtro>`).join('');
+}
+function limpiarItem(obj, idAttr) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (k.startsWith('@_')) { if (idAttr && k === `@_${idAttr}`) out[idAttr] = v; continue; }
+    out[k] = v;
+  }
+  return out;
+}
+
+// ---- Clientes ----------------------------------------------------------------
+export const ATRIBUTOS_CLIENTE_LISTA = [
+  'ClienteID', 'Nombre', 'NombreLegal', 'Localidad', 'Provincia',
+  'CondicionAnteElIVANombre', 'Telefono', 'Email',
+];
+export const ATRIBUTOS_CLIENTE_DETALLE = [
+  'ClienteID', 'Nombre', 'NombreLegal', 'Domicilio', 'Localidad', 'CodigoPostal',
+  'Provincia', 'ProvinciaNombre', 'Pais', 'PaisNombre', 'Telefono', 'Fax', 'Email',
+  'CondicionAnteElIVANombre', 'ClaveTributaria', 'IngresosBrutos',
+  'CondicionPagoNombre', 'MonedaUsualCuentaCorrienteNombre', 'TipoDeClienteNombre',
+  'ActividadDeClienteNombre', 'ContactoDeVenta', 'ContactoDeCobros',
+  'CuentaCliente', 'Referencia', 'HorarioDeAtencion', 'HorarioDeEntrega', 'Observacion',
+];
+
+export async function obtenerClientes({ atributos = ATRIBUTOS_CLIENTE_LISTA, filtros = [] } = {}) {
+  const atribXml = atributos.map(a => `<plat:ClienteAtributos>${esc(a)}</plat:ClienteAtributos>`).join('');
+  const body =
+    `<plat:ObtenerClientes>` +
+    `<plat:AtributosVisibles>${atribXml}</plat:AtributosVisibles>` +
+    `<plat:Filtros>${filtrosXml(filtros)}</plat:Filtros>` +
+    `</plat:ObtenerClientes>`;
+  const soapText = await soapCall('ServicioCCOCliente', 'ObtenerClientes', body);
+  const parsed = extractResult(soapText, 'ObtenerClientesResult');
+  return asArray(parsed?.Clientes?.Cliente).map(c => {
+    const out = limpiarItem(c, 'ClienteID');
+    out.ClienteID = out.ClienteID ?? c['@_ClienteID'];
+    return out;
+  });
+}
+
+// ---- Notas de pedido ---------------------------------------------------------
+export const ATRIBUTOS_PEDIDO_LISTA = [
+  'Division', 'Tipo', 'Numero', 'FechaDeEmision', 'Cliente',
+  'ImporteTotalMonedaOrigen', 'EstadoDeAprobacion', 'ListaDePrecioDeVenta', 'Referencia',
+];
+export const ATRIBUTOS_PEDIDO_DETALLE = [
+  'Division', 'Tipo', 'Numero', 'FechaDeEmision', 'FechaDeAlta', 'Cliente', 'Moneda',
+  'CondicionDePago', 'ListaDePrecioDeVenta', 'Referencia', 'Observacion', 'Transporte',
+  'ImporteBrutoMonedaOrigen', 'ImporteTotalMonedaOrigen', 'EstadoDeAprobacion',
+  'FechaDeAprobacion', 'EsFacturable', 'DepositoBaseDeConfeccion', 'FechaDeEntregaBase',
+  'DireccionDeEntregaCliente',
+];
+
+export async function obtenerNotasDePedido({ atributos = ATRIBUTOS_PEDIDO_LISTA, filtros = [] } = {}) {
+  const atribXml = atributos.map(a => `<plat:NotaDePedidoAtributos>${esc(a)}</plat:NotaDePedidoAtributos>`).join('');
+  const body =
+    `<plat:ObtenerNotasDePedido>` +
+    `<plat:AtributosVisibles>${atribXml}</plat:AtributosVisibles>` +
+    `<plat:Filtros>${filtrosXml(filtros)}</plat:Filtros>` +
+    `</plat:ObtenerNotasDePedido>`;
+  const soapText = await soapCall('ServicioVENTNotaDePedido', 'ObtenerNotasDePedido', body);
+  const parsed = extractResult(soapText, 'ObtenerNotasDePedidoResult');
+  return asArray(parsed?.NotasDePedido?.NotaDePedido).map(p => {
+    const out = limpiarItem(p, 'NotaDePedido');
+    out.NotaDePedido = out.NotaDePedido ?? p['@_NotaDePedido'];
+    return out;
   });
 }
