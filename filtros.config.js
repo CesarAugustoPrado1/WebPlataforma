@@ -92,22 +92,7 @@ export const CATALOGO_FILTROS = [
   { atributo: "FechaDeBajaParaVentas", label: "Fecha baja ventas", tipo: "date", opciones: "texto", columna: true, habilitado: false },
   { atributo: "NovedadFecha", label: "Modificado desde", tipo: "date", opciones: "texto", columna: false, habilitado: true },];
 
-// Comparadores válidos (enum del WSDL) ofrecidos según el tipo de dato.
-export const COMPARADORES_POR_TIPO = {
-  string:  ["LikeFull", "LikeLeft", "LikeRight", "Equals", "Distinct"],
-  int:     ["Equals", "Distinct", "GreaterThan", "GreaterOrEqualsThan", "LowerThan", "LowerOrEqualsThan"],
-  decimal: ["Equals", "Distinct", "GreaterThan", "GreaterOrEqualsThan", "LowerThan", "LowerOrEqualsThan"],
-  boolean: ["Equals", "Distinct"],
-  date:    ["GreaterOrEqualsThan", "GreaterThan", "LowerOrEqualsThan", "LowerThan", "Equals"],
-};
-
-export const LABEL_COMPARADOR = {
-  LikeFull: "contiene", LikeLeft: "empieza con", LikeRight: "termina con",
-  Equals: "igual a", Distinct: "distinto de",
-  GreaterThan: "mayor que", GreaterOrEqualsThan: "mayor o igual",
-  LowerThan: "menor que", LowerOrEqualsThan: "menor o igual",
-  Null: "es nulo", In: "en lista", NotIn: "no en lista",
-};
+export { COMPARADORES_POR_TIPO, LABEL_COMPARADOR, comparadorPorDefecto } from './filtros.comunes.js';
 
 // ---- Helpers ---------------------------------------------------------------
 const porAtributo = new Map(CATALOGO_FILTROS.map((f) => [f.atributo, f]));
@@ -121,11 +106,6 @@ export function filtrosHabilitados() {
 export function esColumnaValida(atributo) {
   const f = porAtributo.get(atributo);
   return !!(f && f.columna);
-}
-
-/** Comparador por defecto sugerido para un tipo. */
-export function comparadorPorDefecto(tipo) {
-  return (COMPARADORES_POR_TIPO[tipo] || COMPARADORES_POR_TIPO.string)[0];
 }
 
 /** Definición de un filtro por su atributo (o undefined). */

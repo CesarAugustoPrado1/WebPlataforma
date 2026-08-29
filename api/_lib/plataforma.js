@@ -319,3 +319,29 @@ export async function obtenerNotasDePedido({ atributos = ATRIBUTOS_PEDIDO_LISTA,
     return out;
   });
 }
+
+// ---- Valores distintos de CLIENTES (para desplegables de filtros) ------------
+// Deriva de ObtenerClientes(todos) en UNA sola consulta con todas las columnas
+// enumerables pedidas, y cachea el mapa completo. clave = lista de atributos.
+export async function obtenerValoresDistintosClientes(pares) {
+  // pares: [{atributo, nombreAttr}]
+  const atributos = ['ClienteID'];
+  for (const p of pares) {
+    if (!atributos.includes(p.atributo)) atributos.push(p.atributo);
+    if (p.nombreAttr && !atributos.includes(p.nombreAttr)) atributos.push(p.nombreAttr);
+  }
+  const arts = await obtenerClientes({ atributos, filtros: [] });
+  const out = {};
+  for (const p of pares) {
+    const mapa = new Map();
+    for (const c of arts) {
+      const val = (c[p.atributo] ?? '').toString().trim();
+      if (!val) continue;
+      const lbl = p.nombreAttr ? (c[p.nombreAttr] ?? '').toString().trim() : '';
+      if (!mapa.has(val)) mapa.set(val, lbl || val);
+    }
+    out[p.atributo] = [...mapa.entries()].map(([valor, label]) => ({ valor, label }))
+      .sort((x, y) => x.label.localeCompare(y.label, 'es'));
+  }
+  return out;
+}

@@ -3,6 +3,11 @@ import { obtenerNotasDePedido, obtenerClientes, ATRIBUTOS_PEDIDO_DETALLE } from 
 function norm(tipo, comparador, valor) {
   const v = (valor ?? '').toString().trim();
   if (comparador === 'Null') return '';
+  if (tipo === 'boolean') {
+    if (/^(true|1|si|sí)$/i.test(v)) return 'True';
+    if (/^(false|0|no)$/i.test(v)) return 'False';
+    return v;
+  }
   if (tipo === 'decimal') return v.replace('.', ',');
   return v;
 }
