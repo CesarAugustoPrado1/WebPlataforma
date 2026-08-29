@@ -134,6 +134,64 @@ export async function obtenerArticulos({ atributos = ATRIBUTOS_ARTICULO_DEFAULT,
   });
 }
 
+// ---- Tipos de artículo (tabla maestra) --------------------------------------
+export async function obtenerTiposArticulos() {
+  const body =
+    `<plat:ObtenerTiposArticulos>` +
+    `<plat:AtributosVisibles>` +
+    `<plat:TiposArticulosAtributos>Codigo</plat:TiposArticulosAtributos>` +
+    `<plat:TiposArticulosAtributos>Nombre</plat:TiposArticulosAtributos>` +
+    `</plat:AtributosVisibles>` +
+    `<plat:Filtros></plat:Filtros>` +
+    `</plat:ObtenerTiposArticulos>`;
+  const soapText = await soapCall('ServicioSTOCTiposArticulos', 'ObtenerTiposArticulos', body);
+  const parsed = extractResult(soapText, 'ObtenerTiposArticulosResult');
+  // La estructura interna varía; buscamos nodos con Codigo/Nombre.
+  const root = parsed ? Object.values(parsed)[0] : null;
+  let items = [];
+  if (root) {
+    for (const v of Object.values(root)) {
+      for (const nodo of asArray(v)) {
+        if (nodo && (nodo.Codigo !== undefined || nodo.Nombre !== undefined)) {
+          items.push({ valor: String(nodo.Codigo ?? '').trim(), label: String(nodo.Nombre ?? '').trim() });
+        }
+      }
+    }
+  }
+  return items.filter((i) => i.valor !== '');
+}
+
+/**
+ * Valores distintos de un atributo, derivados del padrón de artículos.
+ * Devuelve [{valor, label}] ordenados. Si hay nombreAttr, lo usa como etiqueta.
+ */
+export async function obtenerValoresDistintos(atributo, nombreAttr = null) {
+  const atributos = ['ArticuloID', atributo];
+  if (nombreAttr && nombreAttr !== '__tipos__') atributos.push(nombreAttr);
+  const arts = await obtenerArticulos({ atributos, filtros: [] });
+  const mapa = new Map();
+  for (const a of arts) {
+    const val = (a[atributo] ?? '').toString().trim();
+    if (!val) continue;
+    const lbl = nombreAttr && nombreAttr !== '__tipos__' ? (a[nombreAttr] ?? '').toString().trim() : '';
+    if (!mapa.has(val)) mapa.set(val, lbl || val);
+  }
+  return [...mapa.entries()]
+    .map(([valor, label]) => ({ valor, label }))
+    .sort((x, y) => x.label.localeCompare(y.label, 'es'));
+}
+
+// Caché en memoria (persiste mientras la instancia serverless esté "tibia").
+const _cache = new Map();
+const _TTL = Number(process.env.VALORES_TTL_MS || 10 * 60 * 1000);
+export async function conCache(clave, fn) {
+  const hit = _cache.get(clave);
+  if (hit && Date.now() - hit.t < _TTL) return hit.v;
+  const v = await fn();
+  _cache.set(clave, { v, t: Date.now() });
+  return v;
+}
+
 // ---- Stock -------------------------------------------------------------------
 export const ATRIBUTOS_STOCK_DEFAULT = [
   'StockFisicoActual', 'StockReservadoEnPedidos', 'StockEgresarPedidosVentas',
