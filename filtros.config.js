@@ -31,11 +31,11 @@ export const CATALOGO_FILTROS = [
   // Nombres de las clasificaciones: el ERP no los expone por WS, se definen acá
   // (deducidos por sus valores). Ajustá los labels al criterio real de PIRKA.
   { atributo: "Clasificacion1Articulos", label: "Línea", tipo: "string", opciones: "lista", nombreAttr: "Clasificacion1ArticulosNombre", columna: true, habilitado: true },
-  { atributo: "Clasificacion2Articulos", label: "Marca", tipo: "string", opciones: "lista", nombreAttr: "Clasificacion2ArticulosNombre", columna: true, habilitado: true },
+  { atributo: "Clasificacion2Articulos", label: "Empresa", tipo: "string", opciones: "lista", nombreAttr: "Clasificacion2ArticulosNombre", columna: true, habilitado: true },
   { atributo: "Clasificacion3Articulos", label: "Vigencia", tipo: "string", opciones: "lista", nombreAttr: "Clasificacion3ArticulosNombre", columna: true, habilitado: true },
-  { atributo: "Clasificacion4Articulos", label: "Familia", tipo: "string", opciones: "lista", nombreAttr: "Clasificacion4ArticulosNombre", columna: true, habilitado: false },
+  { atributo: "Clasificacion4Articulos", label: "Tipo", tipo: "string", opciones: "lista", nombreAttr: "Clasificacion4ArticulosNombre", columna: true, habilitado: false },
   { atributo: "Clasificacion5Articulos", label: "Tipo de insumo", tipo: "string", opciones: "lista", nombreAttr: "Clasificacion5ArticulosNombre", columna: true, habilitado: false },
-  { atributo: "Clasificacion6Articulos", label: "Modelo", tipo: "string", opciones: "lista", nombreAttr: "Clasificacion6ArticulosNombre", columna: true, habilitado: false },
+  { atributo: "Clasificacion6Articulos", label: "Artículo", tipo: "string", opciones: "lista", nombreAttr: "Clasificacion6ArticulosNombre", columna: true, habilitado: false },
   { atributo: "Clasificacion7Articulos", label: "Presentación", tipo: "string", opciones: "lista", nombreAttr: "Clasificacion7ArticulosNombre", columna: true, habilitado: false },
   { atributo: "Clasificacion8Articulos", label: "Clasificación 8", tipo: "string", opciones: "lista", nombreAttr: "Clasificacion8ArticulosNombre", columna: true, habilitado: false },
   { atributo: "Clasificacion9Articulos", label: "Clasificación 9", tipo: "string", opciones: "lista", nombreAttr: "Clasificacion9ArticulosNombre", columna: true, habilitado: false },
