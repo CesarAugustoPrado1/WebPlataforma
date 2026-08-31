@@ -48,7 +48,7 @@ const NS_POR_SERVICIO = {
 const nsDe = (service) => NS_POR_SERVICIO[service] || CONFIG.ns;
 
 // Llamada SOAP 1.1 cruda. Devuelve el texto XML completo de la respuesta.
-async function soapCall(service, action, innerBodyXml) {
+async function soapCall(service, action, innerBodyXml, timeoutMs = CONFIG.timeoutMs) {
   const url = `${CONFIG.baseUrl}/${service}.asmx`;
   const ns = nsDe(service);
   const envelope =
@@ -57,7 +57,7 @@ async function soapCall(service, action, innerBodyXml) {
     `<soap:Body>${innerBodyXml}</soap:Body></soap:Envelope>`;
 
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), CONFIG.timeoutMs);
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   let res;
   try {
     res = await fetch(url, {
@@ -71,7 +71,7 @@ async function soapCall(service, action, innerBodyXml) {
     });
   } catch (e) {
     const reason = e.name === 'AbortError'
-      ? `timeout tras ${CONFIG.timeoutMs}ms`
+      ? `timeout tras ${timeoutMs}ms`
       : e.message;
     throw new Error(`No se pudo contactar el ERP (${service}.${action}): ${reason}`);
   } finally {
@@ -214,7 +214,7 @@ export const ATRIBUTOS_STOCK_DEFAULT = [
  * Stock por depósito de una lista de IDs de artículo.
  * Devuelve [{articuloId, articuloEmpresa, depositos:[{depositoId, ...}], total:{...}}]
  */
-export async function obtenerStock({ articulosId = [], depositosId = [], atributos = ATRIBUTOS_STOCK_DEFAULT, unidadMedida = null } = {}) {
+export async function obtenerStock({ articulosId = [], depositosId = [], atributos = ATRIBUTOS_STOCK_DEFAULT, unidadMedida = null, timeoutMs } = {}) {
   const atribXml = atributos.map(a => `<plat:ArticuloStockAtributos>${esc(a)}</plat:ArticuloStockAtributos>`).join('');
   const idsXml = articulosId.map(id => `<plat:string>${esc(id)}</plat:string>`).join('');
   const depXml = depositosId.map(id => `<plat:string>${esc(id)}</plat:string>`).join('');
@@ -227,7 +227,7 @@ export async function obtenerStock({ articulosId = [], depositosId = [], atribut
   if (unidadMedida) body += `<plat:UnidadMedidaExpresion>${esc(unidadMedida)}</plat:UnidadMedidaExpresion>`;
   body += `</plat:ObtenerStockDeArticulos_Nuevo>`;
 
-  const soapText = await soapCall('ServicioSTOCArticulo', 'ObtenerStockDeArticulos_Nuevo', body);
+  const soapText = await soapCall('ServicioSTOCArticulo', 'ObtenerStockDeArticulos_Nuevo', body, timeoutMs);
   const parsed = extractResult(soapText, 'ObtenerStockDeArticulos_NuevoResult');
   const arts = asArray(parsed?.StockDeArticulos?.Articulo);
 
@@ -378,4 +378,27 @@ export async function obtenerRenglonesPendientes(clienteId, estado = 'Pendiente'
   const soapText = await soapCall('ServicioVENTNotaDePedido', 'ObtenerDetalleNotaPedido', body);
   const parsed = extractResult(soapText, 'ObtenerDetalleNotaPedidoResult');
   return asArray(parsed?.DetallesNotasPedido?.DetalleNotaPedido).map((r) => limpiarItem(r));
+}
+
+// ---- Demanda: stock disponible por configuración PF (rápido, cruzando clientes) ----
+// Usa ObtenerStockDisponibleConfiguracionPF (cálculo preconfigurado en Plataforma),
+// muchísimo más rápido que ObtenerStockDeArticulos_Nuevo para pedidos pendientes.
+export async function obtenerStockDisponiblePF(configId, articulosId = []) {
+  const ints = articulosId.map((id) => `<plat:int>${esc(id)}</plat:int>`).join('');
+  const body =
+    `<plat:ObtenerStockDisponibleConfiguracionPF>` +
+    `<plat:StockDisponibleConfiguracionPFID>${esc(configId)}</plat:StockDisponibleConfiguracionPFID>` +
+    `<plat:ArticuloID>${ints}</plat:ArticuloID>` +
+    `</plat:ObtenerStockDisponibleConfiguracionPF>`;
+  const soapText = await soapCall('ServicioSTOCArticulo', 'ObtenerStockDisponibleConfiguracionPF', body);
+  const parsed = extractResult(soapText, 'ObtenerStockDisponibleConfiguracionPFResult');
+  return asArray(parsed?.StockDisponible?.Articulo).map((a) => ({
+    articuloId: a['@_ArticuloID'],
+    articuloEmpresa: a['@_ArticuloEmpresa'] ?? a.ArticuloEmpresa ?? null,
+    depositos: a.Depositos ?? '',
+    fisico: toNumber(a.StockFisicoActual) || 0,
+    reservado: toNumber(a.StockReservado) || 0,
+    egresarPedidos: toNumber(a.StockEgresarPedidosVentas) || 0,
+    disponible: toNumber(a.StockDisponibleActual) || 0,
+  }));
 }

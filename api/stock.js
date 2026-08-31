@@ -8,7 +8,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Falta el parámetro ids (ej: ?ids=666,667)' });
     }
     const um = (req.query.um || '').toString().trim() || null;
-    const stock = await obtenerStock({ articulosId: ids, unidadMedida: um });
+    const attrs = (req.query.attrs || '').toString().split(',').map((s) => s.trim()).filter(Boolean);
+    const timeoutMs = Number(req.query.timeout) || undefined;
+    const stock = await obtenerStock({ articulosId: ids, unidadMedida: um, timeoutMs, ...(attrs.length ? { atributos: attrs } : {}) });
     res.status(200).json({ stock });
   } catch (err) {
     res.status(502).json({ error: err.message });

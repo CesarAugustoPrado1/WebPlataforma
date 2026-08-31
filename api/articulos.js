@@ -49,11 +49,21 @@ export default async function handler(req, res) {
       else filtros = [{ atributo: 'Nombre', comparador: 'LikeFull', valor: q }];
     }
 
-    // Columnas a traer: las por defecto + los atributos de los filtros usados (si son columnas válidas).
-    const extra = filtros
-      .map((f) => f.atributo)
-      .filter((a) => esColumnaValida(a) && !ATRIBUTOS_ARTICULO_DEFAULT.includes(a));
-    const atributos = [...ATRIBUTOS_ARTICULO_DEFAULT, ...new Set(extra)];
+    // Columnas a traer. Si viene ?atributos=... (lista), se usa esa (validada);
+    // si no, las por defecto + los atributos de los filtros usados (si son columnas válidas).
+    let atributos;
+    if (req.query.atributos) {
+      const pedidos = req.query.atributos.toString().split(',').map((s) => s.trim()).filter(Boolean);
+      // Acepta columnas válidas y sus variantes "…Nombre" (cuya base es columna).
+      const ok = (a) => a === 'ArticuloID' || esColumnaValida(a) || (a.endsWith('Nombre') && esColumnaValida(a.replace(/Nombre$/, '')));
+      const validos = pedidos.filter(ok);
+      atributos = validos.length ? [...new Set(['ArticuloID', ...validos])] : ATRIBUTOS_ARTICULO_DEFAULT;
+    } else {
+      const extra = filtros
+        .map((f) => f.atributo)
+        .filter((a) => esColumnaValida(a) && !ATRIBUTOS_ARTICULO_DEFAULT.includes(a));
+      atributos = [...ATRIBUTOS_ARTICULO_DEFAULT, ...new Set(extra)];
+    }
 
     let articulos = await obtenerArticulos({ atributos, filtros });
 

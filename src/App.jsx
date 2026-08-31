@@ -5,6 +5,7 @@ import PedidosView from './views/Pedidos.jsx';
 import StockView from './views/Stock.jsx';
 import CuentaCorrienteView from './views/CuentaCorriente.jsx';
 import PendientesView from './views/Pendientes.jsx';
+import DemandaView from './views/Demanda.jsx';
 
 function useHealth() {
   const [health, setHealth] = useState({ estado: 'cargando' });
@@ -31,6 +32,7 @@ const TABS = [
   { id: 'pedidos', label: 'Pedidos' },
   { id: 'cuentacorriente', label: 'Cuenta corriente' },
   { id: 'pendientes', label: 'Renglones pendientes' },
+  { id: 'demanda', label: 'Demanda' },
 ];
 
 export default function App() {
@@ -59,6 +61,7 @@ export default function App() {
       {tab === 'pedidos' && <PedidosView />}
       {tab === 'cuentacorriente' && <CuentaCorrienteView />}
       {tab === 'pendientes' && <PendientesView />}
+      {tab === 'demanda' && <DemandaView />}
     </div>
   );
 }
