@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { CATALOGO_FILTROS } from '../../filtros.config.js';
 import { useBuscador } from '../components/useBuscador.jsx';
 import StockPanel from '../components/StockPanel.jsx';
+import Agrupador from '../components/Agrupador.jsx';
 import { norm } from '../lib/format.js';
 
 export default function ArticulosView() {
@@ -10,6 +11,7 @@ export default function ArticulosView() {
   const [error, setError] = useState('');
   const [refine, setRefine] = useState('');
   const [sel, setSel] = useState(null);
+  const [modo, setModo] = useState('lista');
 
   const onBuscar = useCallback((filtros) => {
     setEstado('cargando'); setError(''); setSel(null);
@@ -38,12 +40,31 @@ export default function ArticulosView() {
     return articulos.filter((a) => campos.some((c) => norm(a[c]).includes(q)));
   }, [articulos, refine, colsExtra]);
 
+  const dims = useMemo(() => {
+    const base = [{ key: 'TipoDeArticulo', label: 'Tipo de artículo' }];
+    const extra = colsExtra.filter((c) => c.tipo === 'string').map((c) => ({ key: c.atributo, label: c.label }));
+    const vistos = new Set(); const out = [];
+    for (const d of [...base, ...extra]) if (!vistos.has(d.key)) { vistos.add(d.key); out.push(d); }
+    return out;
+  }, [colsExtra]);
+
   return (
     <div className="vista">
       {toolbar}
       {chips}
       {estado === 'error' && <div className="error-box">{error}</div>}
-      {estado === 'ok' && <div className="resultados-count">{vista.length}{refine ? ` de ${articulos.length}` : ''} artículo(s)</div>}
+      {estado === 'ok' && (
+        <div className="sub-toolbar">
+          <div className="vista-toggle">
+            <button className={modo === 'lista' ? 'activo' : ''} onClick={() => setModo('lista')}>Lista</button>
+            <button className={modo === 'agrupar' ? 'activo' : ''} onClick={() => setModo('agrupar')}>Agrupar</button>
+          </div>
+          <span className="resultados-count">{vista.length}{refine ? ` de ${articulos.length}` : ''} artículo(s)</span>
+        </div>
+      )}
+      {estado === 'ok' && modo === 'agrupar' ? (
+        <Agrupador data={articulos} dimensiones={dims} medidas={[{ key: 'conteo', label: 'Cantidad de artículos', tipo: 'conteo' }]} />
+      ) : (
       <div className="layout">
         <div className="lista">
           {vista.map((a) => (
@@ -67,6 +88,7 @@ export default function ArticulosView() {
             : <div className="placeholder">Elegí un artículo para ver su stock por depósito.</div>}
         </div>
       </div>
+      )}
       {drawers}
     </div>
   );

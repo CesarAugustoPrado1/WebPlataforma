@@ -161,14 +161,40 @@ export function useBuscador({ catalogo, storageKey, valoresUrl, onBuscar, buscan
   };
   const restablecerAjustes = () => { limpiarOverrides(storageKey); setOverrides({}); setDraft(filtrosEfectivos(catalogo, {})); };
 
-  const filtrosActivos = useMemo(
-    () => filtrosDef.map((f) => ({ atributo: f.atributo, tipo: f.tipo, ...valores[f.atributo] }))
+  const activosDe = useCallback((vals) =>
+    filtrosDef.map((f) => ({ atributo: f.atributo, tipo: f.tipo, ...vals[f.atributo] }))
       .filter((f) => (f.valor ?? '').toString().trim() !== ''),
-    [filtrosDef, valores]
-  );
+    [filtrosDef]);
+  const filtrosActivos = useMemo(() => activosDe(valores), [activosDe, valores]);
 
   const disparar = useCallback(() => { setDrawer(null); onBuscar(filtrosActivos); }, [onBuscar, filtrosActivos]);
   const restablecerValores = () => { setValores(seed(filtrosDef)); setRefine?.(''); };
+
+  // --- Presets: "Mis consultas" (combinaciones de filtros guardadas) ---
+  const PRESETS_KEY = `${storageKey}:presets`;
+  const [presets, setPresets] = useState(() => { try { return JSON.parse(localStorage.getItem(PRESETS_KEY)) || {}; } catch { return {}; } });
+  const [presetSel, setPresetSel] = useState('');
+  const persistirPresets = (p) => { try { localStorage.setItem(PRESETS_KEY, JSON.stringify(p)); } catch { /* ignore */ } };
+  const guardarPreset = () => {
+    const nombre = (window.prompt('Nombre de la consulta:') || '').trim();
+    if (!nombre) return;
+    const p = { ...presets, [nombre]: valores };
+    setPresets(p); persistirPresets(p); setPresetSel(nombre);
+  };
+  const cargarPreset = (nombre) => {
+    setPresetSel(nombre);
+    const snap = presets[nombre]; if (!snap) return;
+    const base = seed(filtrosDef);
+    for (const a of Object.keys(base)) if (snap[a]) base[a] = snap[a];
+    setValores(base); setDrawer(null); onBuscar(activosDe(base));
+  };
+  const borrarPreset = () => {
+    if (!presetSel || !presets[presetSel]) return;
+    if (!window.confirm(`¿Borrar la consulta "${presetSel}"?`)) return;
+    const p = { ...presets }; delete p[presetSel];
+    setPresets(p); persistirPresets(p); setPresetSel('');
+  };
+  const nombresPreset = Object.keys(presets);
 
   const toolbar = (
     <div className="toolbar">
@@ -178,6 +204,14 @@ export function useBuscador({ catalogo, storageKey, valoresUrl, onBuscar, buscan
       </button>
       <button className="btn-icono" title="Ajustes de filtros" onClick={abrirAjustes}>⚙</button>
       <button className="btn-primario" onClick={disparar} disabled={buscando}>{buscando ? 'Buscando…' : 'Buscar'}</button>
+      <div className="presets">
+        <select value={presetSel} onChange={(e) => cargarPreset(e.target.value)} title="Mis consultas">
+          <option value="">Mis consultas…</option>
+          {nombresPreset.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <button className="btn-sec chico" title="Guardar consulta actual" onClick={guardarPreset}>＋ Guardar</button>
+        {presetSel && <button className="btn-sec chico" title="Borrar consulta" onClick={borrarPreset}>🗑</button>}
+      </div>
     </div>
   );
 

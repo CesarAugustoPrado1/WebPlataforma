@@ -1,7 +1,18 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { CATALOGO_PEDIDOS } from '../../pedidos.config.js';
 import { useBuscador } from '../components/useBuscador.jsx';
+import Agrupador from '../components/Agrupador.jsx';
 import { norm, fmtMoneda, fmtFecha } from '../lib/format.js';
+
+const DIMS_PED = [
+  { key: 'Cliente', label: 'Cliente' },
+  { key: 'Tipo', label: 'Tipo de pedido' },
+  { key: 'Division', label: 'División' },
+];
+const MEDS_PED = [
+  { key: 'importe', label: 'Importe total', tipo: 'suma', get: (r) => r.ImporteTotalMonedaOrigen },
+  { key: 'conteo', label: 'Cantidad de pedidos', tipo: 'conteo' },
+];
 
 const DETALLE = [
   ['ClienteNombre', 'Cliente'], ['Cliente', 'Cliente ID'], ['FechaDeEmision', 'Emisión', 'fecha'],
@@ -56,6 +67,7 @@ export default function PedidosView() {
   const [error, setError] = useState('');
   const [refine, setRefine] = useState('');
   const [sel, setSel] = useState(null);
+  const [modo, setModo] = useState('lista');
 
   const onBuscar = useCallback((filtros) => {
     setEstado('cargando'); setError(''); setSel(null);
@@ -84,7 +96,18 @@ export default function PedidosView() {
       <div className="hint-bar">Por <b>Número</b> es instantáneo (borrá la fecha para que no lo acote). Los rangos de fecha amplios o por cliente son lentos en el ERP (20-60s).</div>
       {chips}
       {estado === 'error' && <div className="error-box">{error}</div>}
-      {estado === 'ok' && <div className="resultados-count">{vista.length}{refine ? ` de ${pedidos.length}` : ''} pedido(s)</div>}
+      {estado === 'ok' && (
+        <div className="sub-toolbar">
+          <div className="vista-toggle">
+            <button className={modo === 'lista' ? 'activo' : ''} onClick={() => setModo('lista')}>Lista</button>
+            <button className={modo === 'agrupar' ? 'activo' : ''} onClick={() => setModo('agrupar')}>Agrupar</button>
+          </div>
+          <span className="resultados-count">{vista.length}{refine ? ` de ${pedidos.length}` : ''} pedido(s)</span>
+        </div>
+      )}
+      {estado === 'ok' && modo === 'agrupar' ? (
+        <Agrupador data={pedidos} dimensiones={DIMS_PED} medidas={MEDS_PED} />
+      ) : (
       <div className="layout">
         <div className="lista">
           {vista.map((p) => (
@@ -104,6 +127,7 @@ export default function PedidosView() {
             : <div className="placeholder">Elegí un pedido para ver su cabecera.</div>}
         </div>
       </div>
+      )}
       {drawers}
     </div>
   );

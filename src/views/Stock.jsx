@@ -2,9 +2,19 @@ import { useState, useCallback, useMemo } from 'react';
 import { CATALOGO_FILTROS } from '../../filtros.config.js';
 import { useBuscador } from '../components/useBuscador.jsx';
 import StockPanel from '../components/StockPanel.jsx';
+import Agrupador from '../components/Agrupador.jsx';
 import { fmtNum as fmt, parseNum, norm } from '../lib/format.js';
 
 const TOPE = 150; // máximo de artículos a los que traemos stock en lote
+
+const DIMS_STOCK = [
+  { key: 'UnidadDeMedidaDeStock', label: 'Unidad de medida' },
+];
+const MEDS_STOCK = [
+  { key: 'fisico', label: 'Stock físico', tipo: 'suma', get: (r) => r.fisico },
+  { key: 'reservado', label: 'Reservado', tipo: 'suma', get: (r) => r.reservado },
+  { key: 'conteo', label: 'Cantidad de artículos', tipo: 'conteo' },
+];
 
 export default function StockView() {
   const [estado, setEstado] = useState('idle');
@@ -14,6 +24,7 @@ export default function StockView() {
   const [refine, setRefine] = useState('');
   const [sel, setSel] = useState(null);
   const [orden, setOrden] = useState('fisico'); // 'fisico' | 'nombre'
+  const [modo, setModo] = useState('lista');
 
   const onBuscar = useCallback((filtros) => {
     setEstado('cargando'); setError(''); setSel(null); setTruncado(0);
@@ -67,15 +78,24 @@ export default function StockView() {
       {truncado > 0 && <div className="hint-bar">Mostrando stock de los primeros {TOPE} de {truncado} artículos. Afiná los filtros para ver otros.</div>}
       {estado === 'ok' && (
         <div className="sub-toolbar">
+          <div className="vista-toggle">
+            <button className={modo === 'lista' ? 'activo' : ''} onClick={() => setModo('lista')}>Lista</button>
+            <button className={modo === 'agrupar' ? 'activo' : ''} onClick={() => setModo('agrupar')}>Agrupar</button>
+          </div>
           <span className="resultados-count">{vista.length} artículo(s)</span>
-          <label className="muted-sm">Orden:&nbsp;
-            <select value={orden} onChange={(e) => setOrden(e.target.value)} className="filtro-comp">
-              <option value="fisico">Más stock primero</option>
-              <option value="nombre">Nombre</option>
-            </select>
-          </label>
+          {modo === 'lista' && (
+            <label className="muted-sm">Orden:&nbsp;
+              <select value={orden} onChange={(e) => setOrden(e.target.value)} className="filtro-comp">
+                <option value="fisico">Más stock primero</option>
+                <option value="nombre">Nombre</option>
+              </select>
+            </label>
+          )}
         </div>
       )}
+      {estado === 'ok' && modo === 'agrupar' ? (
+        <Agrupador data={filas} dimensiones={DIMS_STOCK} medidas={MEDS_STOCK} />
+      ) : (
       <div className="layout">
         <div className="lista">
           {vista.map((f) => (
@@ -95,6 +115,7 @@ export default function StockView() {
             : <div className="placeholder">Elegí un artículo para ver el stock por depósito.</div>}
         </div>
       </div>
+      )}
       {drawers}
     </div>
   );

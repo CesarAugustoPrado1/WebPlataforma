@@ -1,18 +1,35 @@
 import { useState, useEffect, useMemo } from 'react';
 import ListaClientes from '../components/ListaClientes.jsx';
+import Agrupador from '../components/Agrupador.jsx';
 import { fmtNum, fmtMoneda, fmtFecha, parseNum, norm } from '../lib/format.js';
 
 const ESTADOS = ['Pendiente', 'Parcial', 'Total', 'Todos'];
+
+const DIMS_PEND = [
+  { key: 'ArticuloNombre', label: 'Artículo' },
+  { key: 'ArticuloTipoNombre', label: 'Tipo de artículo' },
+  { key: 'UnidadDeMedida', label: 'Unidad de medida' },
+  { key: 'Tipo', label: 'Tipo de pedido' },
+  { key: 'FechaEntrega', label: 'Fecha de entrega', get: (r) => fmtFecha(r.FechaEntrega) },
+];
+const MEDS_PEND = [
+  { key: 'pend', label: 'Cant. pendiente', tipo: 'suma', get: (r) => r.CantidadPendienteRemitir },
+  { key: 'pedida', label: 'Cant. pedida', tipo: 'suma', get: (r) => r.CantidadPedida },
+  { key: 'entregada', label: 'Cant. entregada', tipo: 'suma', get: (r) => r.CantidadEntregada },
+  { key: 'importe', label: 'Importe pendiente', tipo: 'suma', get: (r) => r.ImportePendienteRemitir },
+  { key: 'conteo', label: 'Cantidad de renglones', tipo: 'conteo' },
+];
 
 function PendientesDetalle({ cliente }) {
   const [estadoRem, setEstadoRem] = useState('Pendiente');
   const [data, setData] = useState({ estado: 'cargando' });
   const [refine, setRefine] = useState('');
+  const [modo, setModo] = useState('lista');
 
   useEffect(() => {
     setData({ estado: 'cargando' });
     fetch(`/api/pendientes?cliente=${encodeURIComponent(cliente.id)}&estado=${encodeURIComponent(estadoRem)}`).then((r) => r.json())
-      .then((d) => { if (d.error) throw new Error(d.error); setData({ estado: 'ok', ...d }); })
+      .then((d) => { if (d.error) throw new Error(d.error); setData({ ...d, estado: 'ok' }); })
       .catch((e) => setData({ estado: 'error', error: e.message }));
   }, [cliente, estadoRem]);
 
@@ -46,9 +63,16 @@ function PendientesDetalle({ cliente }) {
       {data.estado === 'ok' && (data.renglones || []).length > 0 && (
         <>
           <div className="sub-toolbar">
-            <input className="refine chico" value={refine} onChange={(e) => setRefine(e.target.value)} placeholder="Refinar (artículo, pedido…)" />
-            <span className="resultados-count">{vista.length}{refine ? ` de ${data.renglones.length}` : ''} renglón(es)</span>
+            <div className="vista-toggle">
+              <button className={modo === 'lista' ? 'activo' : ''} onClick={() => setModo('lista')}>Lista</button>
+              <button className={modo === 'agrupar' ? 'activo' : ''} onClick={() => setModo('agrupar')}>Agrupar</button>
+            </div>
+            {modo === 'lista' && <input className="refine chico" value={refine} onChange={(e) => setRefine(e.target.value)} placeholder="Refinar (artículo, pedido…)" />}
+            <span className="resultados-count">{modo === 'lista' ? `${vista.length}${refine ? ` de ${data.renglones.length}` : ''} renglón(es)` : `${data.renglones.length} renglón(es)`}</span>
           </div>
+          {modo === 'agrupar' ? (
+            <Agrupador data={data.renglones} dimensiones={DIMS_PEND} medidas={MEDS_PEND} />
+          ) : (
           <div className="tabla-scroll">
             <table>
               <thead><tr>
@@ -71,6 +95,7 @@ function PendientesDetalle({ cliente }) {
               </tbody>
             </table>
           </div>
+          )}
         </>
       )}
     </div>
