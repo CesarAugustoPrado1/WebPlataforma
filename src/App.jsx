@@ -6,6 +6,7 @@ import StockView from './views/Stock.jsx';
 import CuentaCorrienteView from './views/CuentaCorriente.jsx';
 import PendientesView from './views/Pendientes.jsx';
 import DemandaView from './views/Demanda.jsx';
+import PedidosMesView from './views/PedidosMes.jsx';
 
 function useHealth() {
   const [health, setHealth] = useState({ estado: 'cargando' });
@@ -33,24 +34,37 @@ const TABS = [
   { id: 'cuentacorriente', label: 'Cuenta corriente' },
   { id: 'pendientes', label: 'Renglones pendientes' },
   { id: 'demanda', label: 'Demanda' },
+  { id: 'pedidosmes', label: 'Pedidos del mes' },
 ];
+
+// Perfiles: cada usuario ve solo sus pestañas. Se elige con la variable de
+// entorno VITE_PERFIL en el deploy (ej. VITE_PERFIL=cesar). Sin perfil = todo.
+const PERFILES = {
+  cesar: ['pedidosmes'],
+};
 
 export default function App() {
   const health = useHealth();
-  const [tab, setTab] = useState('articulos');
+  const perfil = import.meta.env.VITE_PERFIL;
+  const idsVisibles = perfil && PERFILES[perfil];
+  const tabs = idsVisibles ? TABS.filter((t) => idsVisibles.includes(t.id)) : TABS;
+  const [tab, setTab] = useState(tabs[0].id);
+  const unaSola = tabs.length === 1;
 
   return (
     <div className="app">
       <header>
         <div className="header-izq">
-          <h1>WebPlataforma</h1>
-          <nav className="tabs">
-            {TABS.map((t) => (
-              <button key={t.id} className={`tab ${tab === t.id ? 'activa' : ''}`} onClick={() => setTab(t.id)}>
-                {t.label}
-              </button>
-            ))}
-          </nav>
+          <h1>{unaSola ? tabs[0].label : 'WebPlataforma'}</h1>
+          {!unaSola && (
+            <nav className="tabs">
+              {tabs.map((t) => (
+                <button key={t.id} className={`tab ${tab === t.id ? 'activa' : ''}`} onClick={() => setTab(t.id)}>
+                  {t.label}
+                </button>
+              ))}
+            </nav>
+          )}
         </div>
         <EstadoConexion health={health} />
       </header>
@@ -62,6 +76,7 @@ export default function App() {
       {tab === 'cuentacorriente' && <CuentaCorrienteView />}
       {tab === 'pendientes' && <PendientesView />}
       {tab === 'demanda' && <DemandaView />}
+      {tab === 'pedidosmes' && <PedidosMesView />}
     </div>
   );
 }

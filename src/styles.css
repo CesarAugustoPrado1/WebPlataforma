@@ -133,6 +133,24 @@ h1 { font-size: 20px; margin: 0; letter-spacing: .3px; }
 .progreso { height: 8px; background: var(--panel-2); border-radius: 6px; overflow: hidden; margin: 8px 2px; }
 .progreso-barra { height: 100%; background: var(--accent); transition: width .2s; }
 
+/* Pedidos del mes */
+.pm-top { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin: 18px 0 10px; }
+.pm-top input[type=month] { padding: 9px 11px; border-radius: 9px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); font-size: 15px; }
+.pm-acc { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pm-resumen { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; margin: 6px 2px 14px; }
+.pm-titulo { font-size: 18px; font-weight: 700; text-transform: capitalize; }
+.pm-total { font-size: 15px; color: var(--muted); }
+.pm-total strong { color: var(--text); font-size: 18px; }
+.pm-vacio { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; padding: 20px; border: 1px dashed var(--border); border-radius: 12px; }
+.pm-tipos { display: flex; flex-direction: column; gap: 10px; }
+.pm-tipo { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); overflow: hidden; }
+.pm-tipo-head { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; background: transparent; border: none; color: var(--text); }
+.pm-tipo-head:hover { background: var(--panel-2); }
+.pm-flecha { color: var(--muted); width: 14px; }
+.pm-tipo-nombre { font-size: 16px; font-weight: 600; }
+.pm-tipo-total { margin-left: auto; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pm-tipo .tabla-scroll { padding: 0 8px 10px; }
+
 .chips-activos { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 2px 4px; }
 .chip-filtro {
   font-size: 12px; color: var(--muted); background: var(--panel-2);
