@@ -57,7 +57,10 @@ export default function PedidosMesView() {
           <button className="btn-primario" onClick={() => sincronizar()} disabled={!!sync}>
             {sync ? 'Sincronizando…' : 'Actualizar'}
           </button>
-          {est?.updated && <span className="muted-sm">Última actualización: {new Date(est.updated).toLocaleString('es-AR')}</span>}
+          <button className="btn-sec" onClick={() => sincronizar(`${mes}-01`)} disabled={!!sync} title="Vuelve a juntar todo el mes desde el día 1">
+            Recolectar este mes
+          </button>
+          {est?.updated && <span className="muted-sm">Últ. actualización: {new Date(est.updated).toLocaleString('es-AR')}</span>}
         </div>
       </div>
       {sync && <div className="progreso"><div className="progreso-barra" style={{ width: '100%' }} /></div>}
