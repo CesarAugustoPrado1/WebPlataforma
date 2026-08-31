@@ -64,7 +64,7 @@ export default function DemandaView() {
           {estado === 'cargando' ? 'Generando…' : 'Generar demanda'}
         </button>
       </div>
-      <div className="hint-bar">Suma, por artículo y cruzando todos los clientes, lo comprometido en pedidos de venta pendientes (cálculo preconfigurado del ERP, depósitos de la config PF).</div>
+      <div className="hint-bar">Pedidos de venta pendientes por artículo, cruzando todos los clientes, según el <b>cálculo preconfigurado del ERP</b> (config 1: depósitos 6-Producción y 7). Es un cálculo rápido pero filtrado por el ERP; puede quedar por debajo del pendiente total.</div>
 
       {estado === 'error' && <div className="error-box">{error}</div>}
 
